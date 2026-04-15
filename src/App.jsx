@@ -137,11 +137,11 @@ function countDayCategories(data, maxDay) {
 }
 
 var C = {
-  bg: "#f0f1f5", card: "#ffffff", accent: "#2b5cc4", accentDim: "#dce6f9",
-  red: "#cc3333", redDim: "#fce4e4", green: "#1d8f58", greenDim: "#ddf5e9",
-  yellow: "#b07a00", yellowDim: "#fdf3d7", text: "#1a1d27", textDim: "#5c6478",
-  border: "#d0d4de", orange: "#c06510", orangeDim: "#fde9cd",
-  purple: "#6b45ad", purpleDim: "#ede5fa",
+  bg: "#f5f6fa", card: "#ffffff", accent: "#1d4ea0", accentDim: "#c5d5f0",
+  red: "#b82020", redDim: "#f8d0d0", green: "#157a48", greenDim: "#c8edda",
+  yellow: "#8a6000", yellowDim: "#f5e6b8", text: "#111318", textDim: "#3a3f4d",
+  border: "#b0b6c4", orange: "#a85200", orangeDim: "#f5d9b5",
+  purple: "#5a35a0", purpleDim: "#ddd0f5",
 };
 
 var S = {
@@ -155,7 +155,7 @@ var S = {
   btn: function(c) { c = c || C.accent; var isLight = c === C.accentDim; return { background: c, color: isLight ? C.textDim : "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: isLight ? "default" : "pointer", width: "100%" }; },
   btnSm: function(c) { c = c || C.accent; var isLight = c === C.accentDim; return { background: c, color: isLight ? C.textDim : "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: isLight ? "default" : "pointer" }; },
   btnOutline: { background: "none", color: C.accent, border: "1px solid " + C.accent, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" },
-  input: { background: "#ffffff", color: C.text, border: "1px solid " + C.border, borderRadius: 8, padding: "8px 12px", fontSize: 13, width: "100%", boxSizing: "border-box" },
+  input: { background: C.bg, color: C.text, border: "1px solid " + C.border, borderRadius: 8, padding: "8px 12px", fontSize: 13, width: "100%", boxSizing: "border-box" },
   section: { color: C.textDim, fontSize: 12, fontWeight: 600, padding: "12px 20px 4px", letterSpacing: 1 },
 };
 
