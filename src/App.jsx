@@ -564,10 +564,9 @@ function ProgressTab(props) {
             })}
             {(function() {
               var labels = [];
-              var ls = Math.max(1, Math.floor((rangeEnd - rangeStart) / 5));
-              for (var ld = rangeStart; ld <= rangeEnd; ld += ls) {
+              [100, 200, 300, 400, 500].forEach(function(ld) {
                 labels.push(<text key={ld} x={toX(ld)} y={chartH - 4} fill={C.textDim} fontSize={8} textAnchor="middle">{ld + "日"}</text>);
-              }
+              });
               return labels;
             })()}
             {maxDay >= rangeStart && maxDay <= rangeEnd && (
