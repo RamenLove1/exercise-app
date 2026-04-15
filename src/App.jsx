@@ -137,11 +137,11 @@ function countDayCategories(data, maxDay) {
 }
 
 var C = {
-  bg: "#0f1117", card: "#1a1d27", accent: "#4f8cff", accentDim: "#2a4a8a",
-  red: "#ff5a5a", redDim: "#6b2a2a", green: "#3dd68c", greenDim: "#1a4a36",
-  yellow: "#ffc84f", yellowDim: "#5a4520", text: "#e8eaf0", textDim: "#7a7f8e",
-  border: "#2a2d3a", orange: "#ff9f43", orangeDim: "#4a3318",
-  purple: "#a78bfa", purpleDim: "#3b2d6b",
+  bg: "#f0f1f5", card: "#ffffff", accent: "#2b5cc4", accentDim: "#dce6f9",
+  red: "#cc3333", redDim: "#fce4e4", green: "#1d8f58", greenDim: "#ddf5e9",
+  yellow: "#b07a00", yellowDim: "#fdf3d7", text: "#1a1d27", textDim: "#5c6478",
+  border: "#d0d4de", orange: "#c06510", orangeDim: "#fde9cd",
+  purple: "#6b45ad", purpleDim: "#ede5fa",
 };
 
 var S = {
@@ -152,10 +152,10 @@ var S = {
   tabIcon: { display: "block", fontSize: 17, marginBottom: 2 },
   card: { background: C.card, borderRadius: 12, margin: "8px 12px", padding: "14px 16px", border: "1px solid " + C.border },
   badge: function(c) { return { display: "inline-block", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: c === "red" ? C.redDim : c === "green" ? C.greenDim : c === "yellow" ? C.yellowDim : c === "purple" ? C.purpleDim : c === "orange" ? C.orangeDim : C.accentDim, color: c === "red" ? C.red : c === "green" ? C.green : c === "yellow" ? C.yellow : c === "purple" ? C.purple : c === "orange" ? C.orange : C.accent, marginLeft: 6 }; },
-  btn: function(c) { c = c || C.accent; return { background: c, color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" }; },
-  btnSm: function(c) { c = c || C.accent; return { background: c, color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }; },
+  btn: function(c) { c = c || C.accent; var isLight = c === C.accentDim; return { background: c, color: isLight ? C.textDim : "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: isLight ? "default" : "pointer", width: "100%" }; },
+  btnSm: function(c) { c = c || C.accent; var isLight = c === C.accentDim; return { background: c, color: isLight ? C.textDim : "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: isLight ? "default" : "pointer" }; },
   btnOutline: { background: "none", color: C.accent, border: "1px solid " + C.accent, borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer" },
-  input: { background: C.bg, color: C.text, border: "1px solid " + C.border, borderRadius: 8, padding: "8px 12px", fontSize: 13, width: "100%", boxSizing: "border-box" },
+  input: { background: "#ffffff", color: C.text, border: "1px solid " + C.border, borderRadius: 8, padding: "8px 12px", fontSize: 13, width: "100%", boxSizing: "border-box" },
   section: { color: C.textDim, fontSize: 12, fontWeight: 600, padding: "12px 20px 4px", letterSpacing: 1 },
 };
 
@@ -572,7 +572,7 @@ function ProgressTab(props) {
             {maxDay >= rangeStart && maxDay <= rangeEnd && (
               <line x1={toX(maxDay)} y1={padT} x2={toX(maxDay)} y2={padT + plotH} stroke={C.accent} strokeWidth={1} strokeDasharray="3,3" opacity={0.5} />
             )}
-            <path d={areaD} fill={C.accent + "15"} />
+            <path d={areaD} fill={C.accent + "20"} />
             <path d={pathD} fill="none" stroke={C.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             {maxDay >= rangeStart && maxDay <= rangeEnd && (
               <circle cx={toX(maxDay)} cy={toY(todayReps)} r={4} fill={C.accent} stroke={C.card} strokeWidth={2} />
