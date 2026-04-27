@@ -60,6 +60,7 @@ var DEFAULT_DATA = {
   startDate: "",
   completedDays: {},
   dayChecks: {},
+  pendingDays: {},
 };
 
 function dayToDate(startDate, dayNum) {
@@ -102,11 +103,27 @@ function getExercisesForDay(startDate, dayNum) {
 }
 
 function countDayCategories(data, maxDay) {
-  var counts = { full: 0, normal: 0, recovered: 0, total: 0 };
+  var counts = { full: 0, normal: 0, recovered: 0, pending: 0, partial: 0, untouched: 0, total: 0 };
   var dc = data.dayChecks || {};
+  var pd = data.pendingDays || {};
   for (var d = 1; d < maxDay; d++) {
     var comp = data.completedDays[d];
-    if (!comp) continue;
+    if (!comp) {
+      if (pd[d]) {
+        counts.pending++;
+      } else {
+        // 完了でも保留でもない経過日：dayChecksに入力があれば部分入力、なければ未入力
+        var dchecks = dc[d] || {};
+        var hasAny = false;
+        var keys = Object.keys(dchecks);
+        for (var ki = 0; ki < keys.length; ki++) {
+          if (dchecks[keys[ki]]) { hasAny = true; break; }
+        }
+        if (hasAny) counts.partial++;
+        else counts.untouched++;
+      }
+      continue;
+    }
     counts.total++;
     var hasRecovered = !!comp.recovered;
     if (!hasRecovered) {
@@ -201,6 +218,7 @@ function HomeTab(props) {
   var dayNum = data.currentDay;
   var isFinished = dayNum > TOTAL_DAYS;
   var isDayCompleted = !!data.completedDays[dayNum];
+  var isPending = !!(data.pendingDays && data.pendingDays[dayNum]);
   var checkedSets = (data.dayChecks && data.dayChecks[dayNum]) || {};
   var activeExercises = getExercisesForDay(data.startDate, dayNum);
 
@@ -258,6 +276,27 @@ function HomeTab(props) {
       newDayChecks[dayNum] = nc;
       var n2 = Object.assign({}, data, { dayChecks: newDayChecks });
       setData(n2); save(n2);
+    }
+  };
+
+  var togglePending = function() {
+    var newPending = Object.assign({}, data.pendingDays || {});
+    if (isPending) {
+      // 保留解除：currentDayはそのまま
+      delete newPending[dayNum];
+      var n = Object.assign({}, data, { pendingDays: newPending });
+      setData(n); save(n);
+    } else {
+      // 保留にする時点で既にチェック済みだったセットを「ロック」として記録。
+      // これらは保留再開時に編集できなくなる（誤って外せないようにするため）
+      var locked = {};
+      Object.keys(checkedSets).forEach(function(k) {
+        if (checkedSets[k]) locked[k] = true;
+      });
+      newPending[dayNum] = { timestamp: Date.now(), lockedSets: locked };
+      var nextDay = dayNum < TOTAL_DAYS ? dayNum + 1 : dayNum;
+      var n = Object.assign({}, data, { pendingDays: newPending, currentDay: nextDay });
+      setData(n); save(n);
     }
   };
 
@@ -367,6 +406,7 @@ function HomeTab(props) {
           <div style={Object.assign({}, S.section, { display: "flex", alignItems: "center", gap: 8 })}>
             <span>{dayNum + "日目のメニュー" + (dateStr ? "（" + dateStr + "）" : "")}</span>
             {isDayCompleted && <span style={S.badge("green")}>✓ 完了済み</span>}
+            {isPending && !isDayCompleted && <span style={S.badge("yellow")}>⏸ 保留中</span>}
           </div>
           {activeExercises.map(function(ex) {
             var reps = getRepsForDay(ex.id, dayNum);
@@ -444,8 +484,13 @@ function HomeTab(props) {
                   if (dayNum >= TOTAL_DAYS) return;
                   if (allChecked && !isDayCompleted) {
                     var nc = Object.assign({}, data.completedDays);
-                    nc[dayNum] = { timestamp: Date.now() };
-                    var n = Object.assign({}, data, { completedDays: nc, currentDay: dayNum + 1 });
+                    var pendingInfo = (data.pendingDays && data.pendingDays[dayNum]) || {};
+                    nc[dayNum] = isPending
+                      ? { timestamp: Date.now(), fromPending: true, lockedSets: pendingInfo.lockedSets || {} }
+                      : { timestamp: Date.now() };
+                    var newPending = Object.assign({}, data.pendingDays || {});
+                    delete newPending[dayNum];
+                    var n = Object.assign({}, data, { completedDays: nc, pendingDays: newPending, currentDay: dayNum + 1 });
                     setData(n); save(n);
                   } else {
                     var n2 = Object.assign({}, data, { currentDay: dayNum + 1 });
@@ -456,6 +501,26 @@ function HomeTab(props) {
                 {(dayNum + 1) + "日目" + (data.startDate ? " " + dayToDateDow(data.startDate, dayNum + 1) : "") + " →"}
               </button>
             </div>
+            {!isDayCompleted && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  style={{
+                    background: isPending ? C.yellowDim : "none",
+                    color: C.yellow,
+                    border: "1px solid " + C.yellow,
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                  onClick={togglePending}
+                >
+                  {isPending ? "↩ 保留を解除する" : "⏸ 保留にする（けが等で運動できない場合）"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -602,20 +667,40 @@ function CalendarTab(props) {
 
   var cats = countDayCategories(data, dayNum);
   var totalPast = dayNum - 1;
-  var skipped = totalPast - cats.total;
+  var skipped = totalPast - cats.total - cats.pending;
 
   var recoverSet = function(dayN, exId, setNum) {
     var key = exId + "_" + setNum;
     var dc = Object.assign({}, data.dayChecks || {});
     var dayCheck = Object.assign({}, dc[dayN] || {});
     var origVal = dayCheck[key];
+    var isDayPending = !!(data.pendingDays && data.pendingDays[dayN]);
+    var compInfo = data.completedDays[dayN];
+    var isFromPending = !!(compInfo && compInfo.fromPending);
+    // 保留中、または保留経由で完了した日は編集可能モード
+    var pendingMode = isDayPending || isFromPending;
+    // 保留にする前から完了していたセット（ロック対象）
+    var pendingInfo = data.pendingDays && data.pendingDays[dayN];
+    var lockedSets = (pendingInfo && pendingInfo.lockedSets) || (compInfo && compInfo.lockedSets) || {};
 
-    if (origVal === "recovered") {
-      delete dayCheck[key];
-    } else if (origVal) {
-      return;
+    if (pendingMode) {
+      // 保留前から完了していたセットは触らせない（誤操作防止）
+      if (lockedSets[key]) return;
+      // 保留日：通常完了として扱う（取戻フラグは付けない）。再度押すとキャンセル可能
+      if (origVal) {
+        delete dayCheck[key];
+      } else {
+        dayCheck[key] = true;
+      }
     } else {
-      dayCheck[key] = "recovered";
+      // 既存の取戻ロジック（HomeTabで通常完了した日のセットは編集不可）
+      if (origVal === "recovered") {
+        delete dayCheck[key];
+      } else if (origVal) {
+        return;
+      } else {
+        dayCheck[key] = "recovered";
+      }
     }
     dc[dayN] = dayCheck;
 
@@ -628,12 +713,28 @@ function CalendarTab(props) {
     });
 
     var newComp = Object.assign({}, data.completedDays);
-    if (allReqDone && !newComp[dayN]) {
-      newComp[dayN] = { timestamp: Date.now(), recovered: true };
-    } else if (!allReqDone && newComp[dayN] && newComp[dayN].recovered) {
-      delete newComp[dayN];
+    var newPending = Object.assign({}, data.pendingDays || {});
+
+    if (pendingMode) {
+      if (allReqDone && !newComp[dayN]) {
+        // 保留→完了：fromPendingフラグ＋ロック情報を引き継いで記録
+        newComp[dayN] = { timestamp: Date.now(), fromPending: true, lockedSets: lockedSets };
+        delete newPending[dayN];
+      } else if (!allReqDone && newComp[dayN] && newComp[dayN].fromPending) {
+        // ノルマ未達に戻ったら完了解除して再び保留状態に戻す（ロック情報も保持）
+        var savedLocked = newComp[dayN].lockedSets || {};
+        delete newComp[dayN];
+        newPending[dayN] = { timestamp: Date.now(), lockedSets: savedLocked };
+      }
+    } else {
+      // 既存の取戻完了ロジック
+      if (allReqDone && !newComp[dayN]) {
+        newComp[dayN] = { timestamp: Date.now(), recovered: true };
+      } else if (!allReqDone && newComp[dayN] && newComp[dayN].recovered) {
+        delete newComp[dayN];
+      }
     }
-    var n = Object.assign({}, data, { dayChecks: dc, completedDays: newComp });
+    var n = Object.assign({}, data, { dayChecks: dc, completedDays: newComp, pendingDays: newPending });
     setData(n); save(n);
   };
 
@@ -653,6 +754,10 @@ function CalendarTab(props) {
         <div>
           <div style={{ fontSize: 10, color: C.textDim }}>🔄 取戻</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: C.orange }}>{cats.recovered}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: C.textDim }}>⏸ 保留</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.yellow }}>{cats.pending}</div>
         </div>
         <div>
           <div style={{ fontSize: 10, color: C.textDim }}>スキップ</div>
@@ -694,6 +799,14 @@ function CalendarTab(props) {
           });
           var allBonusDone = bonusTotal > 0 && bonusChecked === bonusTotal;
           var hasPartial = !item.completed && setsChecked > 0;
+          var isPending = !!(data.pendingDays && data.pendingDays[item.day]);
+          var compInfoItem = data.completedDays[item.day];
+          var isFromPending = !!(compInfoItem && compInfoItem.fromPending);
+          // 保留中、または保留経由で完了済みの日はセットを編集（キャンセル）可能
+          var dayInPendingMode = isPending || isFromPending;
+          // 保留前から完了していたセット（編集不可のロック対象）
+          var pendingInfoItem = data.pendingDays && data.pendingDays[item.day];
+          var lockedSetsItem = (pendingInfoItem && pendingInfoItem.lockedSets) || (compInfoItem && compInfoItem.lockedSets) || {};
           var isSelected = selectedDay === item.day;
           var statusLabel, statusColor, statusIcon;
           if (item.completed && allBonusDone) {
@@ -702,6 +815,9 @@ function CalendarTab(props) {
             statusLabel = "取戻完了"; statusColor = "orange"; statusIcon = "🔄";
           } else if (item.completed) {
             statusLabel = "完了"; statusColor = "green"; statusIcon = "✅";
+          } else if (isPending) {
+            statusLabel = hasPartial ? "保留 " + setsChecked + "/" + setsTotal : "保留";
+            statusColor = "yellow"; statusIcon = "⏸️";
           } else if (hasPartial) {
             statusLabel = setsChecked + "/" + setsTotal; statusColor = "yellow"; statusIcon = "🔶";
           } else {
@@ -742,7 +858,12 @@ function CalendarTab(props) {
                             var done = !!val;
                             var isRecovered = val === "recovered";
                             var isOriginal = done && !isRecovered;
-                            var canTap = !isOriginal;
+                            // 保留前から完了していたセットは触らせない
+                            var isLockedByPending = dayInPendingMode && !!lockedSetsItem[key];
+                            // 保留モードならキャンセル可能（取戻と同じ感覚）。ただしロック済みは除外
+                            var canTap = (!isOriginal || dayInPendingMode) && !isLockedByPending;
+                            // 通常完了（HomeTab経由）またはロック済みは薄表示
+                            var isLocked = (isOriginal && !dayInPendingMode) || isLockedByPending;
                             return (
                               <button key={sn}
                                 onClick={function() { if (canTap) recoverSet(item.day, ex.id, sn); }}
@@ -753,7 +874,7 @@ function CalendarTab(props) {
                                   background: isRecovered ? C.orangeDim : done ? C.greenDim : C.bg,
                                   color: isRecovered ? C.orange : done ? C.green : C.textDim,
                                   cursor: canTap ? "pointer" : "default",
-                                  opacity: isOriginal ? 0.7 : 1,
+                                  opacity: isLocked ? 0.7 : 1,
                                 }}>
                                 <span>{done ? "✓" : "○"}</span>
                                 <span>{"S" + sn}</span>
@@ -839,6 +960,21 @@ function StatsTab(props) {
           { label: "⭐ 全完了", value: cats.full, unit: "日", color: C.purple },
           { label: "✅ 完了", value: cats.normal, unit: "日", color: C.green },
           { label: "🔄 取戻", value: cats.recovered, unit: "日", color: C.orange },
+        ].map(function(s, i) {
+          return (
+            <div key={i} style={Object.assign({}, S.card, { margin: 0, textAlign: "center" })}>
+              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}<span style={{ fontSize: 11 }}>{s.unit}</span></div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "4px 12px 0" }}>
+        {[
+          { label: "⏸ 保留", value: cats.pending, unit: "日", color: cats.pending > 0 ? C.yellow : C.textDim },
+          { label: "🔶 部分入力", value: cats.partial, unit: "日", color: cats.partial > 0 ? C.yellow : C.textDim },
+          { label: "⬜ 未入力", value: cats.untouched, unit: "日", color: cats.untouched > 0 ? C.red : C.textDim },
         ].map(function(s, i) {
           return (
             <div key={i} style={Object.assign({}, S.card, { margin: 0, textAlign: "center" })}>
